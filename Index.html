@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weak Signal - Canvas Render</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Asap+Condensed:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Asap Condensed', sans-serif;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        button {
+            background: #39FF14;
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Asap Condensed', sans-serif;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px #000; 
+        }
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="videoCanvas"></canvas>
+
+    <div id="controls">
+        <button id="playBtn">Initialize Sequence (Play)</button>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CANVAS_WIDTH = 1280;
+        const CANVAS_HEIGHT = 720;
+        const FPS = 60;
+        const BG_COLOR = "#050505";
+        const NEON_GREEN = "#39FF14";
+        const FONT_FAMILY = "Asap Condensed";
+        
+        // --- LYRICS DATA (From Annotation) ---
+        const lyrics = [
+            { time: 15, text: "YOU HEAR THE DIAL TONE" },
+            { time: 19, text: "A GLITCH IN THE CODE" },
+            { time: 23, text: "YOUR OLD LIFE IS CALLING" },
+            { time: 27, text: "YOU CAN'T GO HOME" },
+            { time: 30, text: "YOU KEEP MOVING" },
+            { time: 34, text: "FORWARD MOTION" },
+            { time: 38, text: "DON'T YOU TURN BACK" },
+            { time: 42, text: "THAT SIGNAL'S WEAK" },
+            
+            // Gap (Visuals only here usually)
+            
+            { time: 76, text: "A NEW CONSTRUCT" },
+            { time: 80, text: "YOUR OWN DESIGN" },
+            { time: 84, text: "YOU LEAVE THE STATIC" },
+            { time: 87, text: "ALL BEHIND" },
+            { time: 91, text: "THE CHOICE IS YOURS NOW" },
+            { time: 95, text: "JUST LET IT RING" },
+            { time: 99, text: "A DIFFERENT FUTURE" },
+            { time: 103, text: "THE SONG YOU SING" },
+            { time: 107, text: "YOU KEEP MOVING" },
+            { time: 111, text: "FORWARD MOTION" },
+            { time: 114, text: "DON'T YOU TURN BACK" },
+            { time: 118, text: "THAT SIGNAL'S WEAK" },
+            { time: 153, text: "YOU LEVELED UP" },
+            { time: 157, text: "YOU DIDN'T ANSWER" },
+            { time: 161, text: "MOVING FORWARD" },
+            { time: 165, text: "FOR YOU" },
+            { time: 170, text: "" } 
+        ];
+
+        // --- SETUP ---
+        const canvas = document.getElementById('videoCanvas');
+        const ctx = canvas.getContext('2d');
+        const playBtn = document.getElementById('playBtn');
+        
+        // Handle high DPI displays
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = CANVAS_WIDTH * dpr;
+        canvas.height = CANVAS_HEIGHT * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = `${CANVAS_WIDTH}px`;
+        canvas.style.height = `${CANVAS_HEIGHT}px`;
+
+        // Audio
+        const audio = new Audio('2 - Weak Signal.mp3');
+        let isPlaying = false;
+        let animationId;
+
+        // --- VISUAL ASSETS ---
+        let glitchIntensity = 0;
+        let currentText = "SYSTEM STANDBY...";
+        
+        // --- DRAW FUNCTIONS ---
+
+        function drawGrid() {
+            ctx.strokeStyle = "rgba(57, 255, 20, 0.1)"; // Faint green
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+
+            // Vertical lines
+            for(let x = 0; x <= CANVAS_WIDTH; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CANVAS_HEIGHT);
+                ctx.stroke();
+            }
+            // Horizontal lines
+            for(let y = 0; y <= CANVAS_HEIGHT; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CANVAS_WIDTH, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawScanlines() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            for(let y = 0; y < CANVAS_HEIGHT; y += 4) {
+                ctx.fillRect(0, y, CANVAS_WIDTH, 2);
+            }
+        }
+
+        function drawText(text, time) {
+            ctx.font = `bold 100px "${FONT_FAMILY}"`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const centerX = CANVAS_WIDTH / 2;
+            const centerY = CANVAS_HEIGHT / 2;
+
+            // GLITCH LOGIC
+            // Chance to glitch triggers a random offset
+            let offsetX = 0;
+            let offsetY = 0;
+            let color = NEON_GREEN;
+            let blur = 20;
+
+            // Random glitch flickers
+            if (Math.random() > 0.90) {
+                offsetX = (Math.random() - 0.5) * 20;
+                offsetY = (Math.random() - 0.5) * 5;
+                color = "#FFF"; // Flash white
+                blur = 40;
+            }
+
+            // Text Glow
+            ctx.shadowColor = NEON_GREEN;
+            ctx.shadowBlur = blur;
+            ctx.fillStyle = color;
+
+            // Draw Text
+            ctx.fillText(text, centerX + offsetX, centerY + offsetY);
+            
+            // Reset shadow for other elements
+            ctx.shadowBlur = 0;
+        }
+
+        function drawProgressBar(currentTime, duration) {
+            // Neo-brutalist progress bar at top
+            const progress = currentTime / (duration || 1);
+            const barWidth = CANVAS_WIDTH * progress;
+            
+            ctx.fillStyle = NEON_GREEN;
+            ctx.fillRect(0, 0, barWidth, 10);
+        }
+
+        function drawVisualizerBars(time) {
+            // Simulated frequency bars (since we can't easily analyze local audio without CORS/interaction complexity)
+            // Using a math wave to simulate movement based on time
+            const barCount = 20;
+            const gap = 10;
+            const width = (CANVAS_WIDTH / barCount) - gap;
+            
+            ctx.fillStyle = "rgba(57, 255, 20, 0.2)";
+            
+            for(let i = 0; i < barCount; i++) {
+                const height = Math.abs(Math.sin(time * 2 + i)) * 100 + 10;
+                // Draw at bottom
+                ctx.fillRect(i * (width + gap), CANVAS_HEIGHT - height, width, height);
+            }
+        }
+
+        // --- MAIN LOOP ---
+        function animate() {
+            // 1. Clear Screen
+            ctx.fillStyle = BG_COLOR;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // 2. Get Time
+            const currentTime = isPlaying ? audio.currentTime : 0;
+            const duration = isPlaying ? audio.duration : 180;
+
+            // 3. Determine Lyric
+            let activeText = "";
+            // Find the last passed lyric
+            for(let i = 0; i < lyrics.length; i++) {
+                if(currentTime >= lyrics[i].time) {
+                    activeText = lyrics[i].text;
+                }
+            }
+            if(!isPlaying) activeText = "PRESS INITIALIZE";
+
+            // 4. Draw Layers
+            drawGrid();
+            drawVisualizerBars(Date.now() / 500); // Simulated movement
+            drawText(activeText, currentTime);
+            drawScanlines();
+            drawProgressBar(currentTime, duration);
+
+            // 5. Loop
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // --- CONTROLS ---
+        playBtn.addEventListener('click', () => {
+            if(!isPlaying) {
+                // Try to play audio
+                audio.play().then(() => {
+                    isPlaying = true;
+                    playBtn.innerText = "SEQUENCE RUNNING...";
+                    playBtn.style.background = "#fff"; // Invert styling on play
+                }).catch(e => {
+                    // If audio fails (file missing), run in demo mode
+                    console.log("Audio not found, running demo mode");
+                    isPlaying = true;
+                    // Mock timer for demo
+                    const startTime = Date.now();
+                    // Override audio object for demo
+                    Object.defineProperty(audio, 'currentTime', {
+                        get: function() { return (Date.now() - startTime) / 1000; }
+                    });
+                     playBtn.innerText = "DEMO MODE (NO AUDIO)";
+                });
+            }
+        });
+
+        // Start render loop immediately
+        animate();
+
+    </script>
+</body>
+</html>
